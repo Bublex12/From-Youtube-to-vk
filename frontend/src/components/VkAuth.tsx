@@ -60,6 +60,16 @@ export default function VkAuth({ session, onSessionChange }: Props) {
       .finally(() => setLoadingGroups(false));
   }
 
+  if (session?.source === "env") {
+    return (
+      <div className="vk-auth vk-auth--compact">
+        <span className="vk-auth__user-name">Токен из .env</span>
+        <span className="vk-auth__separator">&rarr;</span>
+        <span className="vk-auth__group-name">{session.group_name}</span>
+      </div>
+    );
+  }
+
   if (!loggedIn) {
     return (
       <div className="vk-auth">

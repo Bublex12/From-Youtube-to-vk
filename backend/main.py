@@ -124,11 +124,20 @@ async def vk_save_token(body: TokenPayload) -> dict:
 
 @app.get("/api/vk/session")
 async def vk_session() -> dict:
+    if config.VK_ACCESS_TOKEN and config.VK_GROUP_ID:
+        return {
+            "logged_in": True,
+            "source": "env",
+            "user_name": ".env",
+            "group_id": config.VK_GROUP_ID,
+            "group_name": f"Группа {config.VK_GROUP_ID}",
+        }
     session = await get_vk_session()
     if not session:
         return {"logged_in": False}
     return {
         "logged_in": True,
+        "source": "oauth",
         "user_id": session["user_id"],
         "user_name": session["user_name"],
         "group_id": session["group_id"],
@@ -284,6 +293,16 @@ def _extract_video_id(url: str) -> str | None:
     return None
 
 
+async def _resolve_vk_creds() -> tuple[str, int]:
+    """Return (access_token, group_id). Prefers .env, falls back to DB session."""
+    if config.VK_ACCESS_TOKEN and config.VK_GROUP_ID:
+        return config.VK_ACCESS_TOKEN, config.VK_GROUP_ID
+    session = await get_vk_session()
+    if session and session.get("access_token") and session.get("group_id"):
+        return session["access_token"], session["group_id"]
+    return "", 0
+
+
 def _build_vk_meta(
     dl_title: str,
     dl_description: str,
@@ -334,15 +353,15 @@ async def _process_single(
         include_yt_link=include_yt_link,
     )
 
-    session = await get_vk_session()
-    if not session or not session.get("access_token") or not session.get("group_id"):
+    vk_token, vk_group = await _resolve_vk_creds()
+    if not vk_token or not vk_group:
         await save_record(url, dl.title, None, quality, "error", "VK не авторизован или группа не выбрана")
         _cleanup(dl.video_path, dl.thumbnail_path)
         return UploadResultItem(url=url, status="error", title=dl.title, error="VK не авторизован или группа не выбрана")
 
     try:
         vk_video_id = await upload_to_vk(
-            dl, session["access_token"], session["group_id"], config.VK_API_VERSION,
+            dl, vk_token, vk_group, config.VK_API_VERSION,
             title=vk_title, description=vk_description,
         )
     except VKUploadError as exc:

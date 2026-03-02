@@ -115,6 +115,7 @@ export async function fetchChannelVideos(
 
 export interface VkSession {
   logged_in: boolean;
+  source?: "env" | "oauth";
   user_id?: number;
   user_name?: string;
   group_id?: number | null;

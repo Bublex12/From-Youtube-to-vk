@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, type FormEvent } from "react";
-import type { TrendingVideo } from "../api.ts";
-import { fetchChannelVideos, uploadSingleVideo } from "../api.ts";
+import type { TrendingVideo, UploadOptions } from "../api.ts";
+import { fetchChannelVideos, uploadSingleVideo, DEFAULT_UPLOAD_OPTIONS } from "../api.ts";
 
 type QueueStatus = "queued" | "processing" | "success" | "error";
 
@@ -34,6 +34,9 @@ export default function ChannelBrowser() {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+
+  const [includeYtDescription, setIncludeYtDescription] = useState(false);
+  const [includeYtLink, setIncludeYtLink] = useState(false);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -100,7 +103,12 @@ export default function ChannelBrowser() {
       });
 
       try {
-        await uploadSingleVideo(item.video.url, "1080", ac.signal);
+        const opts: UploadOptions = {
+          ...DEFAULT_UPLOAD_OPTIONS,
+          includeYtDescription,
+          includeYtLink,
+        };
+        await uploadSingleVideo(item.video.url, "1080", ac.signal, opts);
         setQueue((prev) => {
           const next = [...prev];
           next[i] = { ...next[i], status: "success" };
@@ -157,6 +165,27 @@ export default function ChannelBrowser() {
       </form>
 
       {error && <div className="validation-error">{error}</div>}
+
+      <div className="meta-section__toggles" style={{ marginBottom: 8 }}>
+        <label className="toggle">
+          <input
+            type="checkbox"
+            checked={includeYtDescription}
+            onChange={(e) => setIncludeYtDescription(e.target.checked)}
+            disabled={isUploading}
+          />
+          <span className="toggle__label">Описание с YouTube</span>
+        </label>
+        <label className="toggle">
+          <input
+            type="checkbox"
+            checked={includeYtLink}
+            onChange={(e) => setIncludeYtLink(e.target.checked)}
+            disabled={isUploading}
+          />
+          <span className="toggle__label">Добавить ссылку на YouTube</span>
+        </label>
+      </div>
 
       {/* Queue panel */}
       {queue.length > 0 && (

@@ -8,7 +8,7 @@ from .downloader import DownloadResult
 
 logger = logging.getLogger(__name__)
 
-UPLOAD_TIMEOUT = 600
+UPLOAD_TIMEOUT = 1800
 
 
 class VKUploadError(Exception):
@@ -20,11 +20,12 @@ async def upload_to_vk(
     token: str,
     group_id: int,
     api_version: str,
-    source_url: str,
+    title: str,
+    description: str,
 ) -> str:
     """Upload a downloaded video to VK and return '{owner_id}_{video_id}'."""
 
-    video_id = await _save_and_upload(result, token, group_id, api_version, source_url)
+    video_id = await _save_and_upload(result, token, group_id, api_version, title, description)
     owner_id = -group_id
     return f"{owner_id}_{video_id}"
 
@@ -34,13 +35,14 @@ async def _save_and_upload(
     token: str,
     group_id: int,
     api_version: str,
-    source_url: str,
+    title: str,
+    description: str,
 ) -> int:
-    logger.info("VK: calling video.save for '%s'", result.title)
+    logger.info("VK: calling video.save for '%s'", title)
 
     save_params: dict = {
-        "name": result.title[:128],
-        "description": source_url,
+        "name": title[:128],
+        "description": description[:5000],
         "wallpost": 0,
         "group_id": group_id,
         "access_token": token,
@@ -58,10 +60,13 @@ async def _save_and_upload(
 
     logger.info("VK: uploading file to upload_url (video_id=%s)", video_id)
 
-    async with httpx.AsyncClient(timeout=UPLOAD_TIMEOUT) as client:
-        with open(result.video_path, "rb") as f:
-            resp = await client.post(upload_url, files={"video_file": ("video.mp4", f, "video/mp4")})
-            upload_data = resp.json()
+    try:
+        async with httpx.AsyncClient(timeout=UPLOAD_TIMEOUT) as client:
+            with open(result.video_path, "rb") as f:
+                resp = await client.post(upload_url, files={"video_file": ("video.mp4", f, "video/mp4")})
+                upload_data = resp.json()
+    except httpx.TimeoutException:
+        raise VKUploadError("Таймаут загрузки на VK — файл слишком большой или медленное соединение")
 
     if "error" in upload_data:
         raise VKUploadError(f"VK upload error: {upload_data['error']}")

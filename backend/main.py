@@ -52,6 +52,10 @@ app.add_middleware(
 class UploadRequest(BaseModel):
     urls: List[str]
     quality: str = "1080"
+    custom_title: str = ""
+    custom_description: str = ""
+    include_yt_description: bool = False
+    include_yt_link: bool = False
 
 
 class UploadResultItem(BaseModel):
@@ -72,7 +76,14 @@ async def upload_videos(body: UploadRequest) -> List[UploadResultItem]:
     results: List[UploadResultItem] = []
 
     for url in body.urls:
-        result_item = await _process_single(url, body.quality)
+        result_item = await _process_single(
+            url,
+            body.quality,
+            custom_title=body.custom_title,
+            custom_description=body.custom_description,
+            include_yt_description=body.include_yt_description,
+            include_yt_link=body.include_yt_link,
+        )
         results.append(result_item)
 
     return results
@@ -91,6 +102,41 @@ async def trending() -> list[dict]:
 @app.get("/api/channel")
 async def channel_videos(url: str) -> list[dict]:
     return await fetch_channel_videos(url)
+
+
+@app.get("/api/meta")
+async def video_meta(url: str) -> dict:
+    """Fetch YouTube video title and description without downloading."""
+    return await asyncio.to_thread(_fetch_meta_sync, url)
+
+
+def _fetch_meta_sync(url: str) -> dict:
+    import yt_dlp
+
+    ydl_opts: dict = {
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+        "cookiefile": config.YT_COOKIES,
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            if info is None:
+                return {"title": "", "description": "", "thumbnail": ""}
+    except Exception as exc:
+        logger.error("Meta fetch failed for %s: %s", url, exc)
+        return {"title": "", "description": "", "thumbnail": "", "error": str(exc)}
+
+    video_id = info.get("id", "")
+    return {
+        "title": info.get("title", ""),
+        "description": info.get("description", "") or "",
+        "thumbnail": f"https://i.ytimg.com/vi/{video_id}/mqdefault.jpg" if video_id else "",
+        "duration": info.get("duration"),
+        "channel": info.get("uploader") or info.get("channel") or "",
+    }
 
 
 @app.get("/api/thumbnail")
@@ -127,7 +173,39 @@ def _extract_video_id(url: str) -> str | None:
     return None
 
 
-async def _process_single(url: str, quality: str = "1080") -> UploadResultItem:
+def _build_vk_meta(
+    dl_title: str,
+    dl_description: str,
+    source_url: str,
+    *,
+    custom_title: str,
+    custom_description: str,
+    include_yt_description: bool,
+    include_yt_link: bool,
+) -> tuple[str, str]:
+    """Build final VK title and description from user options."""
+    title = custom_title.strip() if custom_title.strip() else dl_title
+
+    parts: list[str] = []
+    if custom_description.strip():
+        parts.append(custom_description.strip())
+    if include_yt_description and dl_description.strip():
+        parts.append(dl_description.strip())
+    if include_yt_link:
+        parts.append(source_url)
+
+    return title, "\n\n".join(parts)
+
+
+async def _process_single(
+    url: str,
+    quality: str = "1080",
+    *,
+    custom_title: str = "",
+    custom_description: str = "",
+    include_yt_description: bool = False,
+    include_yt_link: bool = False,
+) -> UploadResultItem:
     logger.info("=== Processing %s ===", url)
 
     try:
@@ -137,8 +215,19 @@ async def _process_single(url: str, quality: str = "1080") -> UploadResultItem:
         await save_record(url, None, None, quality, "error", str(exc))
         return UploadResultItem(url=url, status="error", error=str(exc))
 
+    vk_title, vk_description = _build_vk_meta(
+        dl.title, dl.description, url,
+        custom_title=custom_title,
+        custom_description=custom_description,
+        include_yt_description=include_yt_description,
+        include_yt_link=include_yt_link,
+    )
+
     try:
-        vk_video_id = await upload_to_vk(dl, config.VK_CLIENT_ID, config.VK_GROUP_ID, config.VK_API_VERSION, url)
+        vk_video_id = await upload_to_vk(
+            dl, config.VK_CLIENT_ID, config.VK_GROUP_ID, config.VK_API_VERSION,
+            title=vk_title, description=vk_description,
+        )
     except VKUploadError as exc:
         logger.error("VK upload failed for %s: %s", url, exc)
         await save_record(url, dl.title, None, quality, "error", str(exc))

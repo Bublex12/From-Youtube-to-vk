@@ -6,7 +6,7 @@ import HistoryList from "./components/HistoryList.tsx";
 import ThumbGrabber from "./components/ThumbGrabber.tsx";
 import ChannelBrowser from "./components/ChannelBrowser.tsx";
 import type { Job } from "./components/JobCard.tsx";
-import { uploadSingleVideo } from "./api.ts";
+import { uploadSingleVideo, type UploadOptions, DEFAULT_UPLOAD_OPTIONS } from "./api.ts";
 import "./App.css";
 
 type Tab = "upload" | "channel" | "trending" | "thumbs" | "history";
@@ -28,7 +28,7 @@ export default function App() {
   }, []);
 
   const handleSubmit = useCallback(
-    async (urls: string[], quality: string) => {
+    async (urls: string[], quality: string, options: UploadOptions) => {
       const ac = new AbortController();
       abortRef.current = ac;
       setProcessing(true);
@@ -58,7 +58,7 @@ export default function App() {
         );
 
         try {
-          const result = await uploadSingleVideo(urls[i], quality, ac.signal);
+          const result = await uploadSingleVideo(urls[i], quality, ac.signal, options);
           setJobs((prev) =>
             prev.map((j, idx) =>
               idx === i
@@ -96,12 +96,12 @@ export default function App() {
   );
 
   const handleTrendingUpload = useCallback(
-    async (url: string) => {
+    async (url: string, options?: UploadOptions) => {
       const ac = new AbortController();
       trendingAbortRef.current = ac;
       setUploadingTrendingUrl(url);
       try {
-        await uploadSingleVideo(url, "1080", ac.signal);
+        await uploadSingleVideo(url, "1080", ac.signal, options ?? DEFAULT_UPLOAD_OPTIONS);
       } catch {
         // ignore — will be in history
       }

@@ -742,3 +742,140 @@ a:hover {
 .btn--stop:hover {
   opacity: 0.9 !important;
 }
+
+/* ── Meta section (title/description/toggles) ── */
+.meta-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.meta-section__input {
+  width: 100%;
+  padding: 10px 14px;
+  background: #1a1d27;
+  border: 1px solid #2e3141;
+  border-radius: 10px;
+  color: #e4e6eb;
+  font-size: 0.88rem;
+  transition: border-color 0.2s;
+}
+
+.meta-section__input::placeholder {
+  color: #555970;
+}
+
+.meta-section__input:focus {
+  outline: none;
+  border-color: #5b9aff;
+}
+
+.meta-section__textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 10px 14px;
+  background: #1a1d27;
+  border: 1px solid #2e3141;
+  border-radius: 10px;
+  color: #e4e6eb;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  transition: border-color 0.2s;
+}
+
+.meta-section__textarea::placeholder {
+  color: #555970;
+}
+
+.meta-section__textarea:focus {
+  outline: none;
+  border-color: #5b9aff;
+}
+
+.meta-section__toggles {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #5b9aff;
+  cursor: pointer;
+}
+
+.toggle__label {
+  font-size: 0.85rem;
+  color: #c0c4d6;
+}
+
+/* ── Fetch meta button ─────────────────────────── */
+.btn--fetch-meta {
+  align-self: flex-start;
+  padding: 7px 18px;
+  border: 1px solid #2e3141;
+  border-radius: 8px;
+  background: #1a1d27;
+  color: #c0c4d6;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.btn--fetch-meta:hover:not(:disabled) {
+  border-color: #5b9aff;
+  color: #e4e6eb;
+}
+
+.btn--fetch-meta:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Meta preview card ─────────────────────────── */
+.meta-preview {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: #1a1d27;
+  border: 1px solid #2e3141;
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.meta-preview__thumb {
+  width: 140px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.meta-preview__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.meta-preview__title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #e4e6eb;
+  margin-bottom: 4px;
+}
+
+.meta-preview__details {
+  font-size: 0.8rem;
+  color: #6b7089;
+  display: flex;
+  gap: 10px;
+}

@@ -29,15 +29,38 @@ export interface TrendingVideo {
   view_count: number | null;
 }
 
+export interface UploadOptions {
+  customTitle: string;
+  customDescription: string;
+  includeYtDescription: boolean;
+  includeYtLink: boolean;
+}
+
+export const DEFAULT_UPLOAD_OPTIONS: UploadOptions = {
+  customTitle: "",
+  customDescription: "",
+  includeYtDescription: false,
+  includeYtLink: false,
+};
+
 export async function uploadSingleVideo(
   url: string,
   quality: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options?: UploadOptions
 ): Promise<UploadResultItem> {
+  const opts = options ?? DEFAULT_UPLOAD_OPTIONS;
   const resp = await fetch(`${BASE_URL}/api/upload`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ urls: [url], quality }),
+    body: JSON.stringify({
+      urls: [url],
+      quality,
+      custom_title: opts.customTitle,
+      custom_description: opts.customDescription,
+      include_yt_description: opts.includeYtDescription,
+      include_yt_link: opts.includeYtLink,
+    }),
     signal,
   });
 
@@ -47,6 +70,23 @@ export async function uploadSingleVideo(
 
   const data: UploadResultItem[] = await resp.json();
   return data[0];
+}
+
+export interface VideoMeta {
+  title: string;
+  description: string;
+  thumbnail: string;
+  duration: number | null;
+  channel: string;
+  error?: string;
+}
+
+export async function fetchVideoMeta(url: string): Promise<VideoMeta> {
+  const resp = await fetch(
+    `${BASE_URL}/api/meta?url=${encodeURIComponent(url)}`
+  );
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return resp.json();
 }
 
 export async function fetchHistory(): Promise<HistoryItem[]> {

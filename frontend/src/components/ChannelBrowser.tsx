@@ -1,4 +1,4 @@
-import { useState, useCallback, type FormEvent } from "react";
+import { useState, useCallback, useRef, type FormEvent } from "react";
 import type { TrendingVideo } from "../api.ts";
 import { fetchChannelVideos, uploadSingleVideo } from "../api.ts";
 
@@ -33,6 +33,7 @@ export default function ChannelBrowser() {
 
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -73,41 +74,62 @@ export default function ChannelBrowser() {
   }
 
   const startUpload = useCallback(async () => {
+    const ac = new AbortController();
+    abortRef.current = ac;
     setIsUploading(true);
 
     for (let i = 0; i < queue.length; i++) {
+      if (ac.signal.aborted) {
+        setQueue((prev) =>
+          prev.map((q, idx) =>
+            idx >= i && q.status === "queued"
+              ? { ...q, status: "error", error: "Остановлено" }
+              : q
+          )
+        );
+        break;
+      }
+
+      const item = queue[i];
+      if (item.status !== "queued") continue;
+
       setQueue((prev) => {
-        if (prev[i].status !== "queued") return prev;
         const next = [...prev];
         next[i] = { ...next[i], status: "processing" };
         return next;
       });
 
-      const item = queue[i];
-      if (item.status !== "queued") continue;
-
       try {
-        await uploadSingleVideo(item.video.url, "1080");
+        await uploadSingleVideo(item.video.url, "1080", ac.signal);
         setQueue((prev) => {
           const next = [...prev];
           next[i] = { ...next[i], status: "success" };
           return next;
         });
       } catch (err) {
-        setQueue((prev) => {
-          const next = [...prev];
-          next[i] = {
-            ...next[i],
-            status: "error",
-            error: err instanceof Error ? err.message : "Ошибка",
-          };
-          return next;
-        });
+        const isAbort = err instanceof DOMException && err.name === "AbortError";
+        setQueue((prev) =>
+          prev.map((q, idx) => {
+            if (idx === i) {
+              return { ...q, status: "error", error: isAbort ? "Остановлено" : (err instanceof Error ? err.message : "Ошибка") };
+            }
+            if (isAbort && idx > i && q.status === "queued") {
+              return { ...q, status: "error", error: "Остановлено" };
+            }
+            return q;
+          })
+        );
+        if (isAbort) break;
       }
     }
 
+    abortRef.current = null;
     setIsUploading(false);
   }, [queue]);
+
+  const stopUpload = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
 
   const queuedCount = queue.filter((q) => q.status === "queued").length;
   const doneCount = queue.filter(
@@ -161,9 +183,12 @@ export default function ChannelBrowser() {
                 </>
               )}
               {isUploading && (
-                <span className="badge badge--processing">
-                  <span className="spinner" /> Загрузка...
-                </span>
+                <button
+                  className="queue-panel__btn btn--stop"
+                  onClick={stopUpload}
+                >
+                  Остановить
+                </button>
               )}
             </div>
           </div>

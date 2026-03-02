@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import re
@@ -25,6 +26,20 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="YT-VK Reupload Service")
+
+
+@app.on_event("startup")
+async def _suppress_win_asyncio_bug() -> None:
+    """Suppress CPython 3.13 SelectorEventLoop assertion spam on Windows."""
+    loop = asyncio.get_running_loop()
+
+    def _handler(loop: asyncio.AbstractEventLoop, context: dict) -> None:
+        exc = context.get("exception")
+        if isinstance(exc, AssertionError) and "Data should not be empty" in str(exc):
+            return
+        loop.default_exception_handler(context)
+
+    loop.set_exception_handler(_handler)
 
 app.add_middleware(
     CORSMiddleware,

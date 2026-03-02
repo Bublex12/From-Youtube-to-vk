@@ -12,10 +12,11 @@ const QUALITIES = [
 
 interface Props {
   onSubmit: (urls: string[], quality: string) => void;
+  onStop: () => void;
   disabled: boolean;
 }
 
-export default function UrlInput({ onSubmit, disabled }: Props) {
+export default function UrlInput({ onSubmit, onStop, disabled }: Props) {
   const [text, setText] = useState("");
   const [quality, setQuality] = useState("1080");
   const [validationError, setValidationError] = useState("");
@@ -72,9 +73,15 @@ export default function UrlInput({ onSubmit, disabled }: Props) {
           ))}
         </select>
 
-        <button type="submit" disabled={disabled || text.trim().length === 0}>
-          {disabled ? "Обработка..." : "Загрузить"}
-        </button>
+        {disabled ? (
+          <button type="button" className="btn--stop" onClick={onStop}>
+            Остановить
+          </button>
+        ) : (
+          <button type="submit" disabled={text.trim().length === 0}>
+            Загрузить
+          </button>
+        )}
       </div>
 
       {validationError && (

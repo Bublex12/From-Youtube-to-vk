@@ -731,3 +731,14 @@ a:hover {
   background: #2e3141;
   color: #6b7089;
 }
+
+/* ── Stop button ─────────────────────────────── */
+.btn--stop {
+  background: linear-gradient(135deg, #ff6b6b, #d63031) !important;
+  color: #fff !important;
+  opacity: 1 !important;
+}
+
+.btn--stop:hover {
+  opacity: 0.9 !important;
+}

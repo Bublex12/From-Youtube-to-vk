@@ -31,12 +31,14 @@ export interface TrendingVideo {
 
 export async function uploadSingleVideo(
   url: string,
-  quality: string
+  quality: string,
+  signal?: AbortSignal
 ): Promise<UploadResultItem> {
   const resp = await fetch(`${BASE_URL}/api/upload`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ urls: [url], quality }),
+    signal,
   });
 
   if (!resp.ok) {

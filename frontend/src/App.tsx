@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import UrlInput from "./components/UrlInput.tsx";
 import JobList from "./components/JobList.tsx";
 import TrendingList from "./components/TrendingList.tsx";
@@ -19,8 +19,18 @@ export default function App() {
     string | null
   >(null);
 
+  const abortRef = useRef<AbortController | null>(null);
+  const trendingAbortRef = useRef<AbortController | null>(null);
+
+  const handleStop = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+  }, []);
+
   const handleSubmit = useCallback(
     async (urls: string[], quality: string) => {
+      const ac = new AbortController();
+      abortRef.current = ac;
       setProcessing(true);
 
       const initial: Job[] = urls.map((url) => ({
@@ -30,6 +40,17 @@ export default function App() {
       setJobs(initial);
 
       for (let i = 0; i < urls.length; i++) {
+        if (ac.signal.aborted) {
+          setJobs((prev) =>
+            prev.map((j, idx) =>
+              idx >= i && j.status === "pending"
+                ? { ...j, status: "error", error: "Остановлено" }
+                : j
+            )
+          );
+          break;
+        }
+
         setJobs((prev) =>
           prev.map((j, idx) =>
             idx === i ? { ...j, status: "processing" } : j
@@ -37,7 +58,7 @@ export default function App() {
         );
 
         try {
-          const result = await uploadSingleVideo(urls[i], quality);
+          const result = await uploadSingleVideo(urls[i], quality, ac.signal);
           setJobs((prev) =>
             prev.map((j, idx) =>
               idx === i
@@ -52,23 +73,23 @@ export default function App() {
             )
           );
         } catch (err) {
+          const isAbort = err instanceof DOMException && err.name === "AbortError";
           setJobs((prev) =>
-            prev.map((j, idx) =>
-              idx === i
-                ? {
-                    ...j,
-                    status: "error",
-                    error:
-                      err instanceof Error
-                        ? err.message
-                        : "Неизвестная ошибка",
-                  }
-                : j
-            )
+            prev.map((j, idx) => {
+              if (idx === i) {
+                return { ...j, status: "error", error: isAbort ? "Остановлено" : (err instanceof Error ? err.message : "Неизвестная ошибка") };
+              }
+              if (isAbort && idx > i && j.status === "pending") {
+                return { ...j, status: "error", error: "Остановлено" };
+              }
+              return j;
+            })
           );
+          if (isAbort) break;
         }
       }
 
+      abortRef.current = null;
       setProcessing(false);
     },
     []
@@ -76,16 +97,23 @@ export default function App() {
 
   const handleTrendingUpload = useCallback(
     async (url: string) => {
+      const ac = new AbortController();
+      trendingAbortRef.current = ac;
       setUploadingTrendingUrl(url);
       try {
-        await uploadSingleVideo(url, "1080");
+        await uploadSingleVideo(url, "1080", ac.signal);
       } catch {
         // ignore — will be in history
       }
+      trendingAbortRef.current = null;
       setUploadingTrendingUrl(null);
     },
     []
   );
+
+  const handleTrendingStop = useCallback(() => {
+    trendingAbortRef.current?.abort();
+  }, []);
 
   return (
     <div className="app">
@@ -130,7 +158,11 @@ export default function App() {
       <main className="app__main">
         {tab === "upload" && (
           <>
-            <UrlInput onSubmit={handleSubmit} disabled={processing} />
+            <UrlInput
+              onSubmit={handleSubmit}
+              onStop={handleStop}
+              disabled={processing}
+            />
             <JobList jobs={jobs} />
           </>
         )}
@@ -140,6 +172,7 @@ export default function App() {
         {tab === "trending" && (
           <TrendingList
             onUpload={handleTrendingUpload}
+            onStop={handleTrendingStop}
             uploadingUrl={uploadingTrendingUrl}
           />
         )}

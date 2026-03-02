@@ -4,6 +4,7 @@ import { fetchTrending } from "../api.ts";
 
 interface Props {
   onUpload: (url: string) => void;
+  onStop: () => void;
   uploadingUrl: string | null;
 }
 
@@ -21,7 +22,7 @@ function formatViews(n: number | null): string {
   return String(n);
 }
 
-export default function TrendingList({ onUpload, uploadingUrl }: Props) {
+export default function TrendingList({ onUpload, onStop, uploadingUrl }: Props) {
   const [videos, setVideos] = useState<TrendingVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -69,17 +70,19 @@ export default function TrendingList({ onUpload, uploadingUrl }: Props) {
               {v.duration != null && <span>{formatDuration(v.duration)}</span>}
             </div>
           </div>
-          <button
-            className="trending-card__btn"
-            disabled={uploadingUrl !== null}
-            onClick={() => onUpload(v.url)}
-          >
-            {uploadingUrl === v.url ? (
-              <span className="spinner" />
-            ) : (
-              "Залить"
-            )}
-          </button>
+          {uploadingUrl === v.url ? (
+            <button className="trending-card__btn btn--stop" onClick={onStop}>
+              Остановить
+            </button>
+          ) : (
+            <button
+              className="trending-card__btn"
+              disabled={uploadingUrl !== null}
+              onClick={() => onUpload(v.url)}
+            >
+              Залить
+            </button>
+          )}
         </div>
       ))}
     </div>

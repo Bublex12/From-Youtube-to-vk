@@ -13,7 +13,10 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 from . import config
-from .database import save_record, get_history
+from .database import (
+    save_record, get_history,
+    save_vk_session, get_vk_session, set_vk_group, clear_vk_session,
+)
 from .downloader import download_video
 from .trending import fetch_trending
 from .channel import fetch_channel_videos
@@ -64,6 +67,114 @@ class UploadResultItem(BaseModel):
     vk_video_id: Optional[str] = None
     title: Optional[str] = None
     error: Optional[str] = None
+
+
+# ── VK Auth ────────────────────────────────────────
+
+REDIRECT_URI = "http://localhost:5173/callback"
+
+
+class TokenPayload(BaseModel):
+    access_token: str
+    user_id: int | None = None
+
+
+class GroupSelectPayload(BaseModel):
+    group_id: int
+    group_name: str = ""
+
+
+@app.get("/api/vk/auth-url")
+async def vk_auth_url() -> dict:
+    app_id = config.VK_APP_ID
+    if not app_id:
+        return {"error": "VK_APP_ID не задан в .env"}
+    url = (
+        f"https://oauth.vk.com/authorize?client_id={app_id}"
+        f"&display=page&redirect_uri={REDIRECT_URI}"
+        f"&scope=video,groups,offline&response_type=token"
+        f"&v={config.VK_API_VERSION}"
+    )
+    return {"url": url}
+
+
+@app.post("/api/vk/token")
+async def vk_save_token(body: TokenPayload) -> dict:
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.get(
+            "https://api.vk.com/method/users.get",
+            params={
+                "access_token": body.access_token,
+                "v": config.VK_API_VERSION,
+                "fields": "first_name,last_name",
+            },
+        )
+        data = resp.json()
+
+    if "error" in data:
+        return {"ok": False, "error": data["error"].get("error_msg", "Ошибка VK API")}
+
+    user = data["response"][0]
+    user_id = user["id"]
+    user_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
+
+    await save_vk_session(body.access_token, user_id, user_name)
+    return {"ok": True, "user_id": user_id, "user_name": user_name}
+
+
+@app.get("/api/vk/session")
+async def vk_session() -> dict:
+    session = await get_vk_session()
+    if not session:
+        return {"logged_in": False}
+    return {
+        "logged_in": True,
+        "user_id": session["user_id"],
+        "user_name": session["user_name"],
+        "group_id": session["group_id"],
+        "group_name": session["group_name"],
+    }
+
+
+@app.get("/api/vk/groups")
+async def vk_groups() -> list[dict]:
+    session = await get_vk_session()
+    if not session:
+        return []
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.get(
+            "https://api.vk.com/method/groups.get",
+            params={
+                "access_token": session["access_token"],
+                "v": config.VK_API_VERSION,
+                "filter": "admin,editor",
+                "extended": 1,
+                "count": 100,
+            },
+        )
+        data = resp.json()
+
+    if "error" in data:
+        return []
+
+    items = data.get("response", {}).get("items", [])
+    return [
+        {"id": g["id"], "name": g.get("name", ""), "photo": g.get("photo_50", "")}
+        for g in items
+    ]
+
+
+@app.post("/api/vk/select-group")
+async def vk_select_group(body: GroupSelectPayload) -> dict:
+    await set_vk_group(body.group_id, body.group_name)
+    return {"ok": True}
+
+
+@app.post("/api/vk/logout")
+async def vk_logout() -> dict:
+    await clear_vk_session()
+    return {"ok": True}
 
 
 @app.get("/api/health")
@@ -223,9 +334,15 @@ async def _process_single(
         include_yt_link=include_yt_link,
     )
 
+    session = await get_vk_session()
+    if not session or not session.get("access_token") or not session.get("group_id"):
+        await save_record(url, dl.title, None, quality, "error", "VK не авторизован или группа не выбрана")
+        _cleanup(dl.video_path, dl.thumbnail_path)
+        return UploadResultItem(url=url, status="error", title=dl.title, error="VK не авторизован или группа не выбрана")
+
     try:
         vk_video_id = await upload_to_vk(
-            dl, config.VK_CLIENT_ID, config.VK_GROUP_ID, config.VK_API_VERSION,
+            dl, session["access_token"], session["group_id"], config.VK_API_VERSION,
             title=vk_title, description=vk_description,
         )
     except VKUploadError as exc:

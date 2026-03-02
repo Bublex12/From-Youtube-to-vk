@@ -879,3 +879,137 @@ a:hover {
   display: flex;
   gap: 10px;
 }
+
+/* ── VK Auth ───────────────────────────────────── */
+.vk-auth {
+  margin-bottom: 20px;
+}
+
+.vk-auth__login-btn {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #4a76a8, #3b6598);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.vk-auth__login-btn:hover {
+  opacity: 0.9;
+}
+
+.vk-auth__user {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.vk-auth__user-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #e4e6eb;
+}
+
+.vk-auth__separator {
+  color: #6b7089;
+  font-size: 0.85rem;
+}
+
+.vk-auth__group-name {
+  font-size: 0.85rem;
+  color: #5b9aff;
+  font-weight: 500;
+}
+
+.vk-auth__logout,
+.vk-auth__change {
+  padding: 4px 12px;
+  border: 1px solid #2e3141;
+  border-radius: 6px;
+  background: transparent;
+  color: #8b8fa3;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.vk-auth__logout:hover {
+  color: #ff6b6b;
+  border-color: #ff6b6b;
+}
+
+.vk-auth__change:hover {
+  color: #5b9aff;
+  border-color: #5b9aff;
+}
+
+.vk-auth--compact {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #1a1d27;
+  border: 1px solid #2e3141;
+  border-radius: 12px;
+  padding: 10px 16px;
+}
+
+.vk-auth__groups {
+  margin-top: 8px;
+}
+
+.vk-auth__groups-title {
+  font-size: 0.9rem;
+  color: #c0c4d6;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.vk-auth__groups-loading,
+.vk-auth__groups-empty {
+  text-align: center;
+  padding: 16px;
+  color: #8b8fa3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.vk-auth__groups-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.vk-auth__group-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid #2e3141;
+  border-radius: 10px;
+  background: #1a1d27;
+  color: #e4e6eb;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  text-align: left;
+}
+
+.vk-auth__group-item:hover {
+  border-color: #5b9aff;
+}
+
+.vk-auth__group-photo {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: cover;
+}

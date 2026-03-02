@@ -28,6 +28,17 @@ def init_db() -> None:
                 created_at REAL NOT NULL
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS vk_session (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                access_token TEXT NOT NULL,
+                user_id INTEGER,
+                user_name TEXT,
+                group_id INTEGER,
+                group_name TEXT,
+                updated_at REAL NOT NULL
+            )
+        """)
 
 
 def _save_record_sync(
@@ -73,6 +84,65 @@ def _get_history_sync(limit: int) -> list[dict]:
 
 async def get_history(limit: int = 100) -> list[dict]:
     return await asyncio.to_thread(_get_history_sync, limit)
+
+
+# ── VK session ────────────────────────────────────
+
+def _save_vk_session_sync(
+    access_token: str,
+    user_id: int | None,
+    user_name: str | None,
+) -> None:
+    with _get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO vk_session (id, access_token, user_id, user_name, group_id, group_name, updated_at)
+            VALUES (1, ?, ?, ?, NULL, NULL, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                access_token=excluded.access_token,
+                user_id=excluded.user_id,
+                user_name=excluded.user_name,
+                group_id=NULL,
+                group_name=NULL,
+                updated_at=excluded.updated_at
+            """,
+            (access_token, user_id, user_name, time.time()),
+        )
+
+
+async def save_vk_session(access_token: str, user_id: int | None, user_name: str | None) -> None:
+    await asyncio.to_thread(_save_vk_session_sync, access_token, user_id, user_name)
+
+
+def _set_vk_group_sync(group_id: int, group_name: str) -> None:
+    with _get_conn() as conn:
+        conn.execute(
+            "UPDATE vk_session SET group_id=?, group_name=?, updated_at=? WHERE id=1",
+            (group_id, group_name, time.time()),
+        )
+
+
+async def set_vk_group(group_id: int, group_name: str) -> None:
+    await asyncio.to_thread(_set_vk_group_sync, group_id, group_name)
+
+
+def _get_vk_session_sync() -> dict | None:
+    with _get_conn() as conn:
+        row = conn.execute("SELECT * FROM vk_session WHERE id=1").fetchone()
+    return dict(row) if row else None
+
+
+async def get_vk_session() -> dict | None:
+    return await asyncio.to_thread(_get_vk_session_sync)
+
+
+def _clear_vk_session_sync() -> None:
+    with _get_conn() as conn:
+        conn.execute("DELETE FROM vk_session WHERE id=1")
+
+
+async def clear_vk_session() -> None:
+    await asyncio.to_thread(_clear_vk_session_sync)
 
 
 init_db()

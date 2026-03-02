@@ -110,3 +110,63 @@ export async function fetchChannelVideos(
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   return resp.json();
 }
+
+// ── VK Auth ──────────────────────────────────────
+
+export interface VkSession {
+  logged_in: boolean;
+  user_id?: number;
+  user_name?: string;
+  group_id?: number | null;
+  group_name?: string | null;
+}
+
+export interface VkGroup {
+  id: number;
+  name: string;
+  photo: string;
+}
+
+export async function fetchVkAuthUrl(): Promise<string> {
+  const resp = await fetch(`${BASE_URL}/api/vk/auth-url`);
+  const data = await resp.json();
+  if (data.error) throw new Error(data.error);
+  return data.url;
+}
+
+export async function sendVkToken(
+  accessToken: string,
+  userId: number | null
+): Promise<{ ok: boolean; user_name?: string; error?: string }> {
+  const resp = await fetch(`${BASE_URL}/api/vk/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ access_token: accessToken, user_id: userId }),
+  });
+  return resp.json();
+}
+
+export async function fetchVkSession(): Promise<VkSession> {
+  const resp = await fetch(`${BASE_URL}/api/vk/session`);
+  return resp.json();
+}
+
+export async function fetchVkGroups(): Promise<VkGroup[]> {
+  const resp = await fetch(`${BASE_URL}/api/vk/groups`);
+  return resp.json();
+}
+
+export async function selectVkGroup(
+  groupId: number,
+  groupName: string
+): Promise<void> {
+  await fetch(`${BASE_URL}/api/vk/select-group`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ group_id: groupId, group_name: groupName }),
+  });
+}
+
+export async function vkLogout(): Promise<void> {
+  await fetch(`${BASE_URL}/api/vk/logout`, { method: "POST" });
+}

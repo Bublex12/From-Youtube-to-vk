@@ -1,12 +1,20 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import UrlInput from "./components/UrlInput.tsx";
 import JobList from "./components/JobList.tsx";
 import TrendingList from "./components/TrendingList.tsx";
 import HistoryList from "./components/HistoryList.tsx";
 import ThumbGrabber from "./components/ThumbGrabber.tsx";
 import ChannelBrowser from "./components/ChannelBrowser.tsx";
+import VkAuth from "./components/VkAuth.tsx";
 import type { Job } from "./components/JobCard.tsx";
-import { uploadSingleVideo, type UploadOptions, DEFAULT_UPLOAD_OPTIONS } from "./api.ts";
+import {
+  uploadSingleVideo,
+  type UploadOptions,
+  type VkSession,
+  DEFAULT_UPLOAD_OPTIONS,
+  fetchVkSession,
+  sendVkToken,
+} from "./api.ts";
 import "./App.css";
 
 type Tab = "upload" | "channel" | "trending" | "thumbs" | "history";
@@ -18,6 +26,34 @@ export default function App() {
   const [uploadingTrendingUrl, setUploadingTrendingUrl] = useState<
     string | null
   >(null);
+
+  const [vkSession, setVkSession] = useState<VkSession | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.includes("access_token=")) {
+      const params = new URLSearchParams(hash.substring(1));
+      const token = params.get("access_token");
+      const userId = params.get("user_id");
+
+      if (token) {
+        window.history.replaceState(null, "", window.location.pathname);
+        sendVkToken(token, userId ? parseInt(userId) : null).then(() => {
+          fetchVkSession().then((s) => {
+            setVkSession(s);
+            setAuthLoading(false);
+          });
+        });
+        return;
+      }
+    }
+
+    fetchVkSession().then((s) => {
+      setVkSession(s);
+      setAuthLoading(false);
+    });
+  }, []);
 
   const abortRef = useRef<AbortController | null>(null);
   const trendingAbortRef = useRef<AbortController | null>(null);
@@ -115,6 +151,8 @@ export default function App() {
     trendingAbortRef.current?.abort();
   }, []);
 
+  const isReady = vkSession?.logged_in && vkSession.group_id != null;
+
   return (
     <div className="app">
       <header className="app__header">
@@ -122,65 +160,79 @@ export default function App() {
         <p>Перезаливка видео с YouTube на ВКонтакте</p>
       </header>
 
-      <nav className="tabs">
-        <button
-          className={`tabs__btn ${tab === "upload" ? "tabs__btn--active" : ""}`}
-          onClick={() => setTab("upload")}
-        >
-          Загрузка
-        </button>
-        <button
-          className={`tabs__btn ${tab === "channel" ? "tabs__btn--active" : ""}`}
-          onClick={() => setTab("channel")}
-        >
-          Канал
-        </button>
-        <button
-          className={`tabs__btn ${tab === "trending" ? "tabs__btn--active" : ""}`}
-          onClick={() => setTab("trending")}
-        >
-          Популярное
-        </button>
-        <button
-          className={`tabs__btn ${tab === "thumbs" ? "tabs__btn--active" : ""}`}
-          onClick={() => setTab("thumbs")}
-        >
-          Превью
-        </button>
-        <button
-          className={`tabs__btn ${tab === "history" ? "tabs__btn--active" : ""}`}
-          onClick={() => setTab("history")}
-        >
-          История
-        </button>
-      </nav>
+      {authLoading ? (
+        <div className="trending-loading">
+          <span className="spinner" /> Загрузка...
+        </div>
+      ) : (
+        <>
+          <VkAuth session={vkSession} onSessionChange={setVkSession} />
 
-      <main className="app__main">
-        {tab === "upload" && (
-          <>
-            <UrlInput
-              onSubmit={handleSubmit}
-              onStop={handleStop}
-              disabled={processing}
-            />
-            <JobList jobs={jobs} />
-          </>
-        )}
+          {isReady && (
+            <>
+              <nav className="tabs">
+                <button
+                  className={`tabs__btn ${tab === "upload" ? "tabs__btn--active" : ""}`}
+                  onClick={() => setTab("upload")}
+                >
+                  Загрузка
+                </button>
+                <button
+                  className={`tabs__btn ${tab === "channel" ? "tabs__btn--active" : ""}`}
+                  onClick={() => setTab("channel")}
+                >
+                  Канал
+                </button>
+                <button
+                  className={`tabs__btn ${tab === "trending" ? "tabs__btn--active" : ""}`}
+                  onClick={() => setTab("trending")}
+                >
+                  Популярное
+                </button>
+                <button
+                  className={`tabs__btn ${tab === "thumbs" ? "tabs__btn--active" : ""}`}
+                  onClick={() => setTab("thumbs")}
+                >
+                  Превью
+                </button>
+                <button
+                  className={`tabs__btn ${tab === "history" ? "tabs__btn--active" : ""}`}
+                  onClick={() => setTab("history")}
+                >
+                  История
+                </button>
+              </nav>
 
-        {tab === "channel" && <ChannelBrowser />}
+              <main className="app__main">
+                {tab === "upload" && (
+                  <>
+                    <UrlInput
+                      onSubmit={handleSubmit}
+                      onStop={handleStop}
+                      disabled={processing}
+                    />
+                    <JobList jobs={jobs} />
+                  </>
+                )}
 
-        {tab === "trending" && (
-          <TrendingList
-            onUpload={handleTrendingUpload}
-            onStop={handleTrendingStop}
-            uploadingUrl={uploadingTrendingUrl}
-          />
-        )}
+                {tab === "channel" && <ChannelBrowser />}
 
-        {tab === "thumbs" && <ThumbGrabber />}
+                {tab === "trending" && (
+                  <TrendingList
+                    onUpload={handleTrendingUpload}
+                    onStop={handleTrendingStop}
+                    uploadingUrl={uploadingTrendingUrl}
+                  />
+                )}
 
-        {tab === "history" && <HistoryList />}
-      </main>
+                {tab === "thumbs" && <ThumbGrabber />}
+
+                {tab === "history" && <HistoryList />}
+              </main>
+            </>
+          )}
+        </>
+      )}
     </div>
   );
 }

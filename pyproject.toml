@@ -1,0 +1,14 @@
+[project]
+name = "yt-vk-web"
+version = "0.1.0"
+description = "Сервис перезаливки видео с YouTube на ВКонтакте"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "yt-dlp",
+    "httpx",
+    "python-dotenv",
+    "python-multipart",
+]
